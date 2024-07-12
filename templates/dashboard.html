@@ -1,0 +1,6 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<p>Balance: ${{ balance }}</p>
+<a href="{{ url_for('top_up') }}">Top Up</a>
+{% endblock %}
