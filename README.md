@@ -1,4 +1,4 @@
-# Trading Algorithm Platform
+# Traddle
 
 This project is a simple web application for a trading algorithm platform that allows users to view machine learning-based trading algorithm predictions. The platform includes a personal dashboard with a demo account balance, and it displays algorithm predictions for different stock tickers.
 
@@ -16,11 +16,6 @@ This project is a simple web application for a trading algorithm platform that a
 ## Setup and Installation
 
 1. **Clone the Repository**
-
-    ```sh
-    git clone https://github.com/yourusername/trading-algorithm-platform.git
-    cd trading-algorithm-platform
-    ```
 
 2. **Create and Activate a Virtual Environment**
 
