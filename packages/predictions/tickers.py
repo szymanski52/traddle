@@ -3,16 +3,11 @@ import pandas as pd
 
 
 class Ticker:
-    __loaded_data = {}
-
     def __init__(self, symbol: str, name: str):
         self.symbol = symbol
         self.name = name
 
     def get_data(self, period="1mo", interval="1h"):
-        if self.__loaded_data[f"{period}_{interval}"] is not None:
-            return self.__loaded_data[f"{period}_{interval}"]
-
         df = yf.download(self.symbol, period=period, interval=interval)
         df = df[['Close']]
         df = df.rename(columns={'Close': 'close'})
@@ -27,7 +22,6 @@ class Ticker:
         df = Ticker.__fix_tz(df)
         df = Ticker.__create_lag_features(df)
 
-        self.__loaded_data[f"{period}_{interval}"] = df
         return df
 
     @staticmethod
