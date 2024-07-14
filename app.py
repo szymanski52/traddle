@@ -1,9 +1,8 @@
 from flask import Flask, render_template, url_for, redirect, request
-import datetime
 
-from algorithm import calculate_metrics, plot_predictions
-from packages.predictions import predict_basic
-from packages.predictions.models import Interval, default_model
+from algorithm import plot_predictions
+from packages.predictions import predict_basic, get_metrics
+from packages.predictions.models import Interval
 from packages.predictions.tickers import all_tickers_data, all_tickers
 
 app = Flask(__name__)
@@ -27,16 +26,16 @@ def show_algorithms():
 
 @app.route('/algorithm/<name>', methods=['GET', 'POST'])
 def show_algorithm(name):
-    selected_ticker = request.form.get('ticker', default=all_tickers[0].symbol)
+    request_ticker = request.form.get('ticker', default=all_tickers[0].symbol)
+    ticker = [ticker for ticker in all_tickers if ticker.symbol == request_ticker][0]
     prediction_intervals = request.form.getlist('intervals')
 
     if not prediction_intervals:
         prediction_intervals = [e for e in Interval]
 
-    ticker_times, actual_values, predictions = predict_basic(selected_ticker, prediction_intervals)
+    ticker_times, actual_values, predictions = predict_basic(ticker.symbol, prediction_intervals)
 
-    # Calculate metrics for the first interval (to show in the template)
-    mse, mae, r2 = calculate_metrics(actual_values, predictions[prediction_intervals[0]])
+    metrics = get_metrics(actual_values, predictions[prediction_intervals[0]], ticker)
 
     # Generate a plot with the selected ticker data and algorithm predictions
     plot_url = plot_predictions(ticker_times, actual_values, predictions, prediction_intervals)
@@ -46,11 +45,11 @@ def show_algorithm(name):
         name=name,
         plot_url=plot_url,
         tickers=all_tickers,
-        selected_ticker=selected_ticker,
-        ticker_data=all_tickers_data[selected_ticker],
-        mse=mse,
-        mae=mae,
-        r2=r2,
+        selected_ticker=ticker.symbol,
+        ticker_data=all_tickers_data[ticker.symbol],
+        mse=metrics.mse,
+        mae=metrics.mae,
+        r2=metrics.r2,
         prediction_intervals=prediction_intervals
     )
 

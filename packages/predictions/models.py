@@ -1,4 +1,5 @@
 import enum
+from uuid import UUID
 
 import joblib
 
@@ -14,9 +15,10 @@ class Interval(enum.Enum):
 class Model:
     __period_to_model = {}
 
-    def __init__(self, name: str, source: str):
+    def __init__(self, name: str, source: str, key: UUID):
         self.name = name
         self.source = source
+        self.key = key
 
         for interval in Interval:
             self.__period_to_model[interval] = joblib.load(f'{source}_{interval.value}.pkl')
@@ -28,4 +30,4 @@ class Model:
         return predictions[:min_length]
 
 
-default_model = Model('LightGBM', 'lightgbm_model')
+default_model = Model('LightGBM', 'lightgbm_model', UUID('34969a0f-2aaf-4ed4-8b23-0e2c1fd37593'))

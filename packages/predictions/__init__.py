@@ -1,7 +1,8 @@
 import datetime
 
-from packages.predictions.models import default_model
-from packages.predictions.tickers import all_tickers_data
+from packages.predictions.metrics import ModelMetrics
+from packages.predictions.models import default_model, Interval
+from packages.predictions.tickers import all_tickers_data, Ticker
 
 
 def predict_basic(selected_ticker: str, prediction_intervals: list):
@@ -36,3 +37,10 @@ def predict_basic(selected_ticker: str, prediction_intervals: list):
     ticker_times = ticker_times[:min_length]
 
     return ticker_times, actual_values, predictions
+
+
+def get_metrics(actual_values, predictions, ticker: Ticker):
+    model_metrics = ModelMetrics(default_model, ticker, Interval.ONE_HOUR)
+    model_metrics.calculate(actual_values, predictions)
+
+    return model_metrics
