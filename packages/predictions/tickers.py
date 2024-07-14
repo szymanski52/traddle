@@ -58,4 +58,4 @@ all_tickers = [
     Ticker("INTC", "Intel Corporation")
 ]
 
-all_tickers_data = {ticker: ticker.get_data() for ticker in all_tickers}
+all_tickers_data = {ticker.symbol: ticker.get_data() for ticker in all_tickers}
