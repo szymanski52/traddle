@@ -1,7 +1,7 @@
 from flask import Flask, render_template, url_for, redirect, request
 
 from algorithm import plot_predictions
-from packages.predictions import predict_basic, get_metrics
+from packages.predictions import predict_basic, get_metrics, repository
 from packages.predictions.models import Interval
 from packages.predictions.tickers import all_tickers_data, all_tickers
 
@@ -12,6 +12,8 @@ balance = 1000
 
 # List of trading algorithms
 algorithms = ["Algorithm 1", "Algorithm 2", "Algorithm 3"]
+
+repository.init('postgresql://postgres:postgres@localhost:8432/traddle')
 
 
 @app.route('/')
