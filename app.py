@@ -1,15 +1,8 @@
 from flask import Flask, render_template, url_for, redirect, request
-import random
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import io
-import base64
-import pandas as pd
 import datetime
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import joblib
 from data_fetcher import fetch_all_ticker_data, tickers
+from algorithm import calculate_metrics, plot_predictions
 
 app = Flask(__name__)
 
@@ -87,40 +80,10 @@ def show_algorithm(name):
     ticker_times = ticker_times[:min_length]
     
     # Calculate metrics for the first interval (to show in the template)
-    mse = mean_squared_error(actual_values, predictions[prediction_intervals[0]])
-    mae = mean_absolute_error(actual_values, predictions[prediction_intervals[0]])
-    r2 = r2_score(actual_values, predictions[prediction_intervals[0]])
+    mse, mae, r2 = calculate_metrics(actual_values, predictions[prediction_intervals[0]])
     
     # Generate a plot with the selected ticker data and algorithm predictions
-    fig, ax = plt.subplots()
-    ax.plot(ticker_times, actual_values, label=f'{selected_ticker} Actual', color='white')
-    colors = {
-        '1h': 'blue',
-        '2h': 'green',
-        '6h': 'orange',
-        '24h': 'red',
-        '3d': 'purple'
-    }
-    for interval in prediction_intervals:
-        ax.plot(ticker_times, predictions[interval], label=f'{interval} Prediction', color=colors[interval])
-    
-    # Add legend
-    ax.legend()
-    ax.set_facecolor('black')
-    fig.patch.set_facecolor('black')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
-    ax.spines['left'].set_color('white')
-    ax.spines['bottom'].set_color('white')
-    ax.yaxis.label.set_color('white')
-    ax.xaxis.label.set_color('white')
-    ax.title.set_color('white')
-    
-    img = io.BytesIO()
-    plt.savefig(img, format='png', facecolor=fig.get_facecolor())
-    img.seek(0)
-    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
-    plt.close(fig)
+    plot_url = plot_predictions(ticker_times, actual_values, predictions, prediction_intervals)
 
     return render_template(
         'algorithm.html',
