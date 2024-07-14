@@ -29,8 +29,20 @@ for ticker in tickers:
     else:
         ticker_data[ticker].index = ticker_data[ticker].index.tz_convert('UTC')
 
-# Load the trained model
-model = joblib.load('lightgbm_model.pkl')
+# Create lag features for the past 3 days (72 hours)
+for ticker in tickers:
+    for lag in range(1, 73):
+        ticker_data[ticker][f'lag_{lag}'] = ticker_data[ticker]['close'].shift(lag)
+    ticker_data[ticker] = ticker_data[ticker].dropna()
+
+# Load the trained models
+models = {
+    '1h': joblib.load('lightgbm_model_1h.pkl'),
+    '2h': joblib.load('lightgbm_model_2h.pkl'),
+    '6h': joblib.load('lightgbm_model_6h.pkl'),
+    '24h': joblib.load('lightgbm_model_24h.pkl'),
+    '3d': joblib.load('lightgbm_model_3d.pkl')
+}
 
 @app.route('/')
 def index():
@@ -43,7 +55,11 @@ def show_algorithms():
 @app.route('/algorithm/<name>', methods=['GET', 'POST'])
 def show_algorithm(name):
     selected_ticker = request.form.get('ticker', tickers[0])
+    prediction_intervals = request.form.getlist('intervals')
     
+    if not prediction_intervals:
+        prediction_intervals = ['1h', '2h', '6h', '24h', '3d']
+
     # Define prediction and input periods
     pred_start_date = datetime.datetime(2024, 7, 7, tzinfo=datetime.timezone.utc)
     pred_end_date = datetime.datetime(2024, 7, 9, tzinfo=datetime.timezone.utc)
@@ -59,36 +75,49 @@ def show_algorithm(name):
     if len(ticker_data_pred) == 0 or len(ticker_data_test) == 0:
         return f"Not enough data for the selected period for ticker {selected_ticker}.", 400
 
-    X_pred = pd.DataFrame({
-        'hour': ticker_data_pred.index.hour,
-        'day': ticker_data_pred.index.day,
-        'month': ticker_data_pred.index.month
-    })
+    X_pred = ticker_data_pred[[f'lag_{lag}' for lag in range(1, 73)]]
     
-    # Generate predictions with the model
-    predictions = model.predict(X_pred)
-    
-    # Ensure matching lengths of predictions and actual values
-    min_length = min(len(predictions), len(actual_values))
-    predictions = predictions[:min_length]
+    predictions = {}
+    for interval in prediction_intervals:
+        preds = models[interval].predict(X_pred)
+        min_length = min(len(preds), len(actual_values))
+        predictions[interval] = preds[:min_length]
+
     actual_values = actual_values[:min_length]
     ticker_times = ticker_times[:min_length]
     
-    # Calculate metrics
-    mse = mean_squared_error(actual_values, predictions)
-    mae = mean_absolute_error(actual_values, predictions)
-    r2 = r2_score(actual_values, predictions)
+    # Calculate metrics for the first interval (to show in the template)
+    mse = mean_squared_error(actual_values, predictions[prediction_intervals[0]])
+    mae = mean_absolute_error(actual_values, predictions[prediction_intervals[0]])
+    r2 = r2_score(actual_values, predictions[prediction_intervals[0]])
     
     # Generate a plot with the selected ticker data and algorithm predictions
     fig, ax = plt.subplots()
-    ax.plot(ticker_times, predictions, label='Algorithm Prediction')
-    ax.plot(ticker_times, actual_values, label=selected_ticker)
+    ax.plot(ticker_times, actual_values, label=f'{selected_ticker} Actual', color='white')
+    colors = {
+        '1h': 'blue',
+        '2h': 'green',
+        '6h': 'orange',
+        '24h': 'red',
+        '3d': 'purple'
+    }
+    for interval in prediction_intervals:
+        ax.plot(ticker_times, predictions[interval], label=f'{interval} Prediction', color=colors[interval])
     
     # Add legend
     ax.legend()
+    ax.set_facecolor('black')
+    fig.patch.set_facecolor('black')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.spines['left'].set_color('white')
+    ax.spines['bottom'].set_color('white')
+    ax.yaxis.label.set_color('white')
+    ax.xaxis.label.set_color('white')
+    ax.title.set_color('white')
     
     img = io.BytesIO()
-    plt.savefig(img, format='png')
+    plt.savefig(img, format='png', facecolor=fig.get_facecolor())
     img.seek(0)
     plot_url = base64.b64encode(img.getvalue()).decode('utf8')
     plt.close(fig)
@@ -102,7 +131,8 @@ def show_algorithm(name):
         ticker_data=ticker_data[selected_ticker],
         mse=mse,
         mae=mae,
-        r2=r2
+        r2=r2,
+        prediction_intervals=prediction_intervals
     )
 
 @app.route('/dashboard')
