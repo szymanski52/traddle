@@ -1,19 +1,44 @@
 body {
+    background-color: #121212;
+    color: #ffffff;
     font-family: Arial, sans-serif;
 }
 
 nav {
-    background-color: #333;
-    color: white;
-    padding: 10px;
+    background-color: #1e1e1e;
+    padding: 1em;
 }
 
-nav a {
-    color: white;
-    margin-right: 10px;
+nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+nav ul li {
+    display: inline;
+    margin-right: 1em;
+}
+
+nav ul li a {
+    color: #ffffff;
     text-decoration: none;
 }
 
-.content {
-    padding: 20px;
+.container {
+    margin: 2em;
 }
+
+h1, h2 {
+    color: #ffffff;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #323232;
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #1e1e1e;
+}
+
+.table-striped th {
+    background-color: #1e
