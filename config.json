@@ -1,5 +1,5 @@
 {
   "db": {
-    "dsn" : "postgresql://postgres:postgres@localhost:5432/traddle"
+    "dsn" : "postgresql://postgres:postgres@localhost:8432/traddle"
   }
 }

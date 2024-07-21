@@ -2,7 +2,7 @@ from sqlalchemy import select, and_, func, column
 from sqlalchemy.orm import Session
 
 from packages.infra_persistence import db_engine
-from packages.predictions import ModelMetrics
+from packages.predictions.metrics import ModelMetrics
 
 
 def save_metrics(metrics: ModelMetrics):

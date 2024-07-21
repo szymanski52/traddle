@@ -1,6 +1,6 @@
 from quart import Quart, render_template, url_for, redirect, request
 
-from algorithm import plot_predictions
+from apps.web.algorithm import plot_predictions
 from packages.predictions import predict_basic, get_metrics
 from packages.predictions.models import Interval
 from packages.predictions.tickers import all_tickers_data, all_tickers
