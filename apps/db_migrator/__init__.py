@@ -2,6 +2,8 @@ from multiprocessing import Process, Queue
 from alembic.config import Config
 from alembic import command
 
+from apps.background import background_app
+
 
 def __alembic_upgrade(queue, dsn, script_location):
     try:
@@ -20,6 +22,8 @@ def run_migrations(dsn, script_location) -> bool:
     Must run in a subprocess, because otherwise Alembic will mess up logging.
     See: https://stackoverflow.com/questions/24622170/using-alembic-api-from-inside-application-code
     """
+    background_app.apply_migrations()
+
     queue = Queue()
     process = Process(target=__alembic_upgrade, args=(queue, dsn, script_location))
     process.start()
