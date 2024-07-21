@@ -29,8 +29,7 @@ class BackgroundApp:
     async def start(self):
         @self.__procrastinate_app.task()
         async def predict(timestamp):
-            # predict_everything()
-            print('Predicting...', timestamp)
+            predict_everything()
 
         async with self.__procrastinate_app.open_async():
             self.__procrastinate_app.periodic(

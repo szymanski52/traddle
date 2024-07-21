@@ -19,9 +19,9 @@ class ModelMetrics(Base):
     model_key: Mapped[UUID]
     ticker_symbol: Mapped[str] = mapped_column(String(5))
     interval: Mapped[str] = mapped_column(String(3))
-    mse: Mapped[float]
-    mae: Mapped[float]
-    r2: Mapped[float]
+    mse: Mapped[float] = mapped_column(types.Float)
+    mae: Mapped[float] = mapped_column(types.Float)
+    r2: Mapped[float] = mapped_column(types.Float)
     timestamp = Column(DateTime, default=func.now())
 
     def __init__(self, model: Model, ticker: Ticker, interval: Interval, **kw: Any):
@@ -37,6 +37,6 @@ class ModelMetrics(Base):
 
     def calculate(self, actual_values, predictions):
         self.timestamp = datetime.utcnow()
-        self.mse = mean_squared_error(actual_values, predictions)
-        self.mae = mean_absolute_error(actual_values, predictions)
-        self.r2 = r2_score(actual_values, predictions)
+        self.mse = mean_squared_error(actual_values, predictions).__float__()
+        self.mae = mean_absolute_error(actual_values, predictions).__float__()
+        self.r2 = r2_score(actual_values, predictions).__float__()

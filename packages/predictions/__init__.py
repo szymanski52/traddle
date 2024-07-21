@@ -3,7 +3,7 @@ import datetime
 from packages.predictions import repository
 from packages.predictions.metrics import ModelMetrics
 from packages.predictions.models import default_model, Interval
-from packages.predictions.tickers import all_tickers_data, Ticker
+from packages.predictions.tickers import all_tickers_data, Ticker, all_tickers
 
 
 def predict_basic(selected_ticker: str, prediction_intervals: list):
@@ -40,16 +40,16 @@ def predict_basic(selected_ticker: str, prediction_intervals: list):
     return ticker_times, actual_values, predictions
 
 
-def get_metrics(actual_values, predictions, ticker: Ticker):
-    model_metrics = ModelMetrics(default_model, ticker, Interval.ONE_HOUR)
+def get_metrics(actual_values, predictions, ticker: Ticker, interval: Interval):
+    model_metrics = ModelMetrics(default_model, ticker, interval)
     model_metrics.calculate(actual_values, predictions)
 
     return model_metrics
 
 
 def predict_everything():
-    for ticker in all_tickers_data:
+    for ticker in all_tickers:
+        ticker_times, actual_values, predictions = predict_basic(ticker.symbol, [e for e in Interval])
         for interval in Interval:
-            ticker_times, actual_values, predictions = predict_basic(ticker, [interval])
-            model = get_metrics(actual_values, predictions[interval], ticker)
+            model = get_metrics(actual_values, predictions[interval], ticker, interval)
             repository.save_metrics(model)

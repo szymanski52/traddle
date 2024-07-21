@@ -15,5 +15,11 @@ if sys.platform == "win32":
 if __name__ == '__main__':
     migrations_dir = os.path.join(Path.cwd(), 'alembic')
     db_migrator.run_migrations(config.get_db_dsn(), migrations_dir)
-    asyncio.run(background_app.start())
+
+
+    @web_app.before_serving
+    async def before_web_app_serving():
+        web_app.add_background_task(background_app.start)
+
+
     asyncio.run(web_app.run_task())
