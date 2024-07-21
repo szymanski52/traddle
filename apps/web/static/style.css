@@ -55,3 +55,17 @@ table.leaderboard {
 .leaderboard th, td {
     padding: 10px 40px 20px 30px;
 }
+
+a {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+a:visited {
+    color: #ffffff;
+}
