@@ -1,11 +1,11 @@
-from flask import Flask, render_template, url_for, redirect, request
+from quart import Quart, render_template, url_for, redirect, request
 
 from algorithm import plot_predictions
 from packages.predictions import predict_basic, get_metrics, repository
 from packages.predictions.models import Interval
 from packages.predictions.tickers import all_tickers_data, all_tickers
 
-app = Flask(__name__)
+app = Quart(__name__)
 
 # Demo account balance
 balance = 1000
@@ -17,20 +17,21 @@ repository.init('postgresql://postgres:postgres@localhost:8432/traddle')
 
 
 @app.route('/')
-def index():
+async def index():
     return render_template('index.html')
 
 
 @app.route('/algorithms')
-def show_algorithms():
+async def show_algorithms():
     return render_template('algorithms.html', algorithms=algorithms)
 
 
 @app.route('/algorithm/<name>', methods=['GET', 'POST'])
-def show_algorithm(name):
-    request_ticker = request.form.get('ticker', default=all_tickers[0].symbol)
+async def show_algorithm(name):
+    form = await request.form
+    request_ticker = form.get('ticker', default=all_tickers[0].symbol)
     ticker = [ticker for ticker in all_tickers if ticker.symbol == request_ticker][0]
-    prediction_intervals = request.form.getlist('intervals')
+    prediction_intervals = form.getlist('intervals')
 
     if not prediction_intervals:
         prediction_intervals = [e for e in Interval]
@@ -57,13 +58,13 @@ def show_algorithm(name):
 
 
 @app.route('/dashboard')
-def dashboard():
+async def dashboard():
     global balance
     return render_template('dashboard.html', balance=balance)
 
 
 @app.route('/top_up')
-def top_up():
+async def top_up():
     global balance
     balance += 100
     return redirect(url_for('dashboard'))
