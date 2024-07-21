@@ -13,7 +13,7 @@ balance = 1000
 # List of trading algorithms
 algorithms = ["Algorithm 1", "Algorithm 2", "Algorithm 3"]
 
-repository.init('postgresql://postgres:postgres@localhost:8432/traddle')
+repository.init()
 
 
 @web_app.route('/')
