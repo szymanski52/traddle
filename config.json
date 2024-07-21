@@ -1,0 +1,5 @@
+{
+  "db": {
+    "dsn" : "postgresql://postgres:postgres@localhost:5432/traddle"
+  }
+}

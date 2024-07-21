@@ -7,8 +7,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sqlalchemy import String, Column, DateTime, func, types
 from sqlalchemy.orm import Mapped, mapped_column
 
+from packages.infra_persistence import Base
 from packages.predictions.models import Model, Interval
-from packages.predictions.persistance import Base
 from packages.predictions.tickers import Ticker
 
 
