@@ -43,13 +43,17 @@ def predict_basic(selected_ticker: str, prediction_intervals: list):
 def get_metrics(actual_values, predictions, ticker: Ticker, interval: Interval):
     model_metrics = ModelMetrics(default_model, ticker, interval)
     model_metrics.calculate(actual_values, predictions)
-
     return model_metrics
+
+
+def load_leaderboard(ticker_symbol: str, interval: str):
+    data = repository.get_metrics_aggregated_by_mean(ticker_symbol, interval)
+    return [{**row, 'model_key': default_model.name} for row in data]
 
 
 def predict_everything():
     for ticker in all_tickers:
         ticker_times, actual_values, predictions = predict_basic(ticker.symbol, [e for e in Interval])
         for interval in Interval:
-            model = get_metrics(actual_values, predictions[interval], ticker, interval)
-            repository.save_metrics(model)
+            model_metrics = get_metrics(actual_values, predictions[interval], ticker, interval)
+            repository.save_metrics(model_metrics)

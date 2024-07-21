@@ -22,4 +22,4 @@ if __name__ == '__main__':
         web_app.add_background_task(background_app.start)
 
 
-    asyncio.run(web_app.run_task())
+    web_app.run(debug=True)

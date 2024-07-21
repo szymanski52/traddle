@@ -1,7 +1,7 @@
 from quart import Quart, render_template, url_for, redirect, request
 
 from apps.web.algorithm import plot_predictions
-from packages.predictions import predict_basic, get_metrics
+from packages.predictions import predict_basic, load_leaderboard, get_metrics
 from packages.predictions.models import Interval
 from packages.predictions.tickers import all_tickers_data, all_tickers
 
@@ -36,7 +36,7 @@ async def show_algorithm(name):
 
     ticker_times, actual_values, predictions = predict_basic(ticker.symbol, prediction_intervals)
 
-    metrics = get_metrics(actual_values, predictions[prediction_intervals[0]], ticker)
+    metrics = get_metrics(actual_values, predictions[prediction_intervals[0]], ticker, Interval.ONE_DAY)
 
     # Generate a plot with the selected ticker data and algorithm predictions
     plot_url = plot_predictions(ticker_times, actual_values, predictions, prediction_intervals)
@@ -66,3 +66,23 @@ async def top_up():
     global balance
     balance += 100
     return redirect(url_for('dashboard'))
+
+
+@web_app.route('/leaderboard')
+async def leaderboard():
+    ticker = request.args.get('ticker')
+    interval = request.args.get('interval')
+    if not ticker:
+        ticker = all_tickers[0].symbol
+    if not interval:
+        interval = Interval.ONE_DAY.value
+
+    rows = load_leaderboard(ticker, interval)
+    return await render_template(
+        'leaderboard.html',
+        leaderboard=rows,
+        all_tickers=[ticker.symbol for ticker in all_tickers],
+        selected_ticker=ticker,
+        all_intervals=[e.value for e in Interval],
+        selected_interval=interval
+    )
