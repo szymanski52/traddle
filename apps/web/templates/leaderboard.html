@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+
+    <h1>Leaderboard</h1>
+
+    <form method="get" action="/leaderboard">
+        <label for="ticker">Choose a ticker:</label>
+        <select id="ticker" name="ticker" required>
+            <!-- Assuming all_tickers is a list of available tickers -->
+            {% for ticker in all_tickers %}
+                <option value="{{ ticker }}"
+                        {% if ticker == selected_ticker %}
+                        selected
+                        {% endif %}
+                >{{ ticker }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="interval">Choose an interval:</label>
+        <select id="interval" name="interval" required>
+            <!-- Assuming all_intervals is a list of available intervals -->
+            {% for interval in all_intervals %}
+                <option value="{{ interval }}"
+                        {% if interval == selected_interval %}
+                        selected
+                        {% endif %}
+                >{{ interval }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Load</button>
+    </form>
+
+    <table id="metricsTable" class="leaderboard">
+        <thead>
+        <tr>
+            <th>Model Key</th>
+            <th>Avg MSE</th>
+            <th>Avg MAE</th>
+            <th>Avg R2</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in leaderboard %}
+            <tr>
+                <td>{{ row.model_key }}</td>
+                <td>{{ "{:.2f}".format(row.avg_mse) }}</td>
+                <td>{{ "{:.2f}".format(row.avg_mae) }}</td>
+                <td>{{ "{:.2f}".format(row.avg_r2) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+{% endblock %}
