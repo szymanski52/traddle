@@ -33,7 +33,7 @@ class BackgroundApp:
 
         async with self.__procrastinate_app.open_async():
             self.__procrastinate_app.periodic(
-                cron='*/1 * * * *',
+                cron=config.get_predict_cron(),
                 queue='default',
             )(predict)
             await self.__procrastinate_app.run_worker_async(install_signal_handlers=False)

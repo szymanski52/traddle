@@ -38,23 +38,27 @@ This project is a simple web application for a trading algorithm platform that a
     ```sh
     pip install -r requirements.txt
     ```
+4. **Run postgres**
+    ```sh	
+    docker compose up -d
+    ```
 
-4. **Run the Application**
+5. **Run the Application**
 
-    Start the Flask application:
+    Start the Quart application:
 
     ```sh
-    export FLASK_APP=app.py
-    export FLASK_ENV=development
-    flask run
+    export QUART_APP=app.py
+    export QUART_ENV=development
+    quart run
     ```
 
     If you are using Windows, use the following commands to set the environment variables:
 
     ```sh
-    set FLASK_APP=app.py
-    set FLASK_ENV=development
-    flask run
+    set QUART_APP=app.py
+    set QUART_ENV=development
+    quart run
     ```
 
 5. **Access the Application**

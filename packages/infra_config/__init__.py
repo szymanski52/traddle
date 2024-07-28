@@ -13,5 +13,8 @@ class Config:
     def get_db_dsn(self):
         return self.data['db']['dsn']
 
+    def get_predict_cron(self):
+        return self.data['predict']['cron']
+
 
 config = Config()
