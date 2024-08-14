@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block content %}
+bruh
+<h1>Algorithm Catalog</h1>
+<ul>
+    {% for algorithm in algorithms %}
+    <li><a href="{{ url_for('show_algorithm', name=algorithm) }}">{{ algorithm }}</a></li>
+    {% endfor %}
+</ul>
+{% endblock %}

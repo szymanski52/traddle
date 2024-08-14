@@ -1,0 +1,362 @@
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import functools
+import inspect
+import logging
+import time
+from enum import Enum
+from typing import Any, Awaitable, Callable, Iterable
+
+from procrastinate import (
+    app,
+    exceptions,
+    job_context,
+    jobs,
+    periodic,
+    signals,
+    tasks,
+    utils,
+)
+
+logger = logging.getLogger(__name__)
+
+
+WORKER_NAME = "worker"
+WORKER_TIMEOUT = 5.0  # seconds
+WORKER_CONCURRENCY = 1  # parallel task(s)
+
+
+class DeleteJobCondition(Enum):
+    """
+    An enumeration with all the possible conditions to delete a job
+    """
+
+    NEVER = "never"  #: Keep jobs in database after completion
+    SUCCESSFUL = "successful"  #: Delete only successful jobs
+    ALWAYS = "always"  #: Always delete jobs at completion
+
+
+class Worker:
+    def __init__(
+        self,
+        app: app.App,
+        queues: Iterable[str] | None = None,
+        name: str | None = None,
+        concurrency: int = WORKER_CONCURRENCY,
+        wait: bool = True,
+        timeout: float = WORKER_TIMEOUT,
+        listen_notify: bool = True,
+        delete_jobs: str | DeleteJobCondition = DeleteJobCondition.NEVER.value,
+        additional_context: dict[str, Any] | None = None,
+        install_signal_handlers: bool = True,
+    ):
+        self.app = app
+        self.queues = queues
+        self.worker_name: str = name or WORKER_NAME
+        self.concurrency = concurrency
+
+        self.timeout = timeout
+        self.wait = wait
+        self.listen_notify = listen_notify
+        self.delete_jobs = (
+            DeleteJobCondition(delete_jobs)
+            if isinstance(delete_jobs, str)
+            else delete_jobs
+        )
+
+        self.job_manager = self.app.job_manager
+        self.install_signal_handlers = install_signal_handlers
+
+        if name:
+            self.logger = logger.getChild(name)
+        else:
+            self.logger = logger
+
+        # Handling the info about the currently running task.
+        self.base_context: job_context.JobContext = job_context.JobContext(
+            app=app,
+            worker_name=self.worker_name,
+            worker_queues=self.queues,
+            additional_context=additional_context.copy() if additional_context else {},
+        )
+        self.current_contexts: dict[int, job_context.JobContext] = {}
+        self.stop_requested = False
+        self.notify_event: asyncio.Event | None = None
+
+    def context_for_worker(
+        self, worker_id: int, reset=False, **kwargs
+    ) -> job_context.JobContext:
+        """
+        Retrieves the context for sub-sworker ``worker_id``. If not found, or ``reset``
+        is True, context is recreated from ``self.base_context``. Additionnal parameters
+        are used to update the context. The resulting context is kept and will be
+        returned for later calls.
+        """
+        if reset or worker_id not in self.current_contexts:
+            context = self.base_context
+            kwargs["worker_id"] = worker_id
+            kwargs["additional_context"] = self.base_context.additional_context.copy()
+        else:
+            context = self.current_contexts[worker_id]
+
+        if kwargs:
+            context = context.evolve(**kwargs)
+            self.current_contexts[worker_id] = context
+
+        return context
+
+    async def listener(self):
+        assert self.notify_event
+        return await self.job_manager.listen_for_jobs(
+            event=self.notify_event,
+            queues=self.queues,
+        )
+
+    async def periodic_deferrer(self):
+        deferrer = periodic.PeriodicDeferrer(
+            registry=self.app.periodic_registry,
+            **self.app.periodic_defaults,
+        )
+        return await deferrer.worker()
+
+    async def run(self) -> None:
+        self.notify_event = asyncio.Event()
+        self.stop_requested = False
+
+        self.logger.info(
+            f"Starting worker on {self.base_context.queues_display}",
+            extra=self.base_context.log_extra(
+                action="start_worker", queues=self.queues
+            ),
+        )
+        context = contextlib.nullcontext()
+        if self.install_signal_handlers:
+            context = signals.on_stop(self.stop)
+
+        with context:
+            side_coros = [self.periodic_deferrer()]
+            if self.wait and self.listen_notify:
+                side_coros.append(self.listener())
+
+            await utils.run_tasks(
+                main_coros=(
+                    self.single_worker(worker_id=worker_id)
+                    for worker_id in range(self.concurrency)
+                ),
+                side_coros=side_coros,
+                graceful_stop_callback=self.stop,
+            )
+
+        self.logger.info(
+            f"Stopped worker on {self.base_context.queues_display}",
+            extra=self.base_context.log_extra(action="stop_worker", queues=self.queues),
+        )
+        self.notify_event = None
+
+    async def single_worker(self, worker_id: int):
+        current_timeout = self.timeout * (worker_id + 1)
+        while not self.stop_requested:
+            job = await self.job_manager.fetch_job(self.queues)
+            if job:
+                await self.process_job(job=job, worker_id=worker_id)
+            else:
+                if not self.wait or self.stop_requested:
+                    break
+                await self.wait_for_job(timeout=current_timeout)
+                current_timeout = self.timeout * self.concurrency
+
+    async def wait_for_job(self, timeout: float):
+        assert self.notify_event
+        self.logger.debug(
+            f"Waiting for new jobs on {self.base_context.queues_display}",
+            extra=self.base_context.log_extra(
+                action="waiting_for_jobs", queues=self.queues
+            ),
+        )
+        self.notify_event.clear()
+        try:
+            await asyncio.wait_for(self.notify_event.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            pass
+        else:
+            self.notify_event.clear()
+
+    async def process_job(self, job: jobs.Job, worker_id: int = 0) -> None:
+        context = self.context_for_worker(worker_id=worker_id, job=job)
+
+        self.logger.debug(
+            f"Loaded job info, about to start job {job.call_string}",
+            extra=context.log_extra(action="loaded_job_info"),
+        )
+
+        status, retry_decision = None, None
+        try:
+            await self.run_job(job=job, worker_id=worker_id)
+            status = jobs.Status.SUCCEEDED
+        except exceptions.JobAborted:
+            status = jobs.Status.ABORTED
+
+        except exceptions.JobError as e:
+            status = jobs.Status.FAILED
+            if e.retry_exception:
+                retry_decision = e.retry_exception.retry_decision
+            if e.critical and e.__cause__:
+                raise e.__cause__
+
+        except exceptions.TaskNotFound as exc:
+            status = jobs.Status.FAILED
+            self.logger.exception(
+                f"Task was not found: {exc}",
+                extra=context.log_extra(action="task_not_found", exception=str(exc)),
+            )
+        finally:
+            if retry_decision:
+                await self.job_manager.retry_job(
+                    job=job,
+                    retry_at=retry_decision.retry_at,
+                    priority=retry_decision.priority,
+                    queue=retry_decision.queue,
+                    lock=retry_decision.lock,
+                )
+            else:
+                assert status is not None
+
+                delete_job = {
+                    DeleteJobCondition.ALWAYS: True,
+                    DeleteJobCondition.NEVER: False,
+                    DeleteJobCondition.SUCCESSFUL: status == jobs.Status.SUCCEEDED,
+                }[self.delete_jobs]
+
+                await self.job_manager.finish_job(
+                    job=job, status=status, delete_job=delete_job
+                )
+
+            self.logger.debug(
+                f"Acknowledged job completion {job.call_string}",
+                extra=context.log_extra(action="finish_task", status=status),
+            )
+            # Remove job information from the current context
+            self.context_for_worker(worker_id=worker_id, reset=True)
+
+    def find_task(self, task_name: str) -> tasks.Task:
+        try:
+            return self.app.tasks[task_name]
+        except KeyError as exc:
+            raise exceptions.TaskNotFound from exc
+
+    async def run_job(self, job: jobs.Job, worker_id: int) -> None:
+        task_name = job.task_name
+
+        task = self.find_task(task_name=task_name)
+
+        context = self.context_for_worker(worker_id=worker_id, task=task)
+
+        start_time = time.time()
+        context.job_result.start_timestamp = start_time
+
+        self.logger.info(
+            f"Starting job {job.call_string}",
+            extra=context.log_extra(action="start_job"),
+        )
+        job_args = []
+        if task.pass_context:
+            job_args.append(context)
+
+        # Initialise logging variables
+        task_result = None
+        log_title = "Error"
+        log_action = "job_error"
+        log_level = logging.ERROR
+        exc_info: bool | BaseException = False
+
+        await_func: Callable[..., Awaitable]
+        if inspect.iscoroutinefunction(task.func):
+            await_func = task
+        else:
+            await_func = functools.partial(utils.sync_to_async, task)
+
+        try:
+            task_result = await await_func(*job_args, **job.task_kwargs)
+            # In some cases, the task function might be a synchronous function
+            # that returns an awaitable without actually being a
+            # coroutinefunction. In that case, in the await above, we haven't
+            # actually called the task, but merely generated the awaitable that
+            # implements the task. In that case, we want to wait this awaitable.
+            # It's easy enough to be in that situation that the best course of
+            # action is probably to await the awaitable.
+            # It's not even sure it's worth emitting a warning
+            if inspect.isawaitable(task_result):
+                task_result = await task_result
+
+        except exceptions.JobAborted as e:
+            task_result = None
+            log_title = "Aborted"
+            log_action = "job_aborted"
+            log_level = logging.INFO
+            exc_info = e
+            raise
+
+        except BaseException as e:
+            task_result = None
+            log_title = "Error"
+            log_action = "job_error"
+            log_level = logging.ERROR
+            exc_info = e
+            critical = not isinstance(e, Exception)
+
+            retry_exception = task.get_retry_exception(exception=e, job=job)
+            if retry_exception:
+                log_title = "Error, to retry"
+                log_action = "job_error_retry"
+                log_level = logging.INFO
+            raise exceptions.JobError(
+                retry_exception=retry_exception, critical=critical
+            ) from e
+
+        else:
+            log_title = "Success"
+            log_action = "job_success"
+            log_level = logging.INFO
+            exc_info = False
+        finally:
+            end_time = time.time()
+            duration = end_time - start_time
+            context.job_result.end_timestamp = end_time
+            context.job_result.result = task_result
+
+            extra = context.log_extra(action=log_action)
+
+            text = (
+                f"Job {job.call_string} ended with status: {log_title}, "
+                f"lasted {duration:.3f} s"
+            )
+            if task_result:
+                text += f" - Result: {task_result}"[:250]
+            self.logger.log(log_level, text, extra=extra, exc_info=exc_info)
+
+    def stop(self):
+        # Ensure worker will stop after finishing their task
+        self.stop_requested = True
+        # Ensure workers currently waiting are awakened
+        if self.notify_event:
+            self.notify_event.set()
+
+        # Logging
+
+        self.logger.info(
+            "Stop requested",
+            extra=self.base_context.log_extra(action="stopping_worker"),
+        )
+
+        contexts = [
+            context for context in self.current_contexts.values() if context.job
+        ]
+        now = time.time()
+        for context in contexts:
+            self.logger.info(
+                "Waiting for job to finish: "
+                + context.job_description(current_timestamp=now),
+                extra=context.log_extra(action="ending_job"),
+            )

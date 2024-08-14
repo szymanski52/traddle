@@ -1,0 +1,11 @@
+services:
+  traddle-postgres:
+    image: "postgres:latest"
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_USER: "traddle"
+      POSTGRES_PASSWORD: "traddle"
+      POSTGRES_DB: "traddle"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data

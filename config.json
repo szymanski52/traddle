@@ -1,0 +1,8 @@
+{
+  "db": {
+    "dsn" : "postgresql://traddle:traddle@localhost:15432/traddle"
+  },
+  "predict": {
+    "cron": "*/1 * * * *"
+  }
+}

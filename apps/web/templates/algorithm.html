@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>{{ name }}</h1>
+<img src="data:image/png;base64,{{ plot_url }}">
+<div style="display: flex;">
+    <div style="flex-grow: 1;">
+        <h2>Recent Ticker Data</h2>
+        <form method="post">
+            <select name="ticker" onchange="this.form.submit()">
+                {% for ticker in tickers %}
+                <option value="{{ ticker.symbol }}" {% if ticker.symbol == selected_ticker.symbol %}selected{% endif %}>{{ ticker.symbol }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div style="flex-grow: 2;">
+        <h2>{{ selected_ticker }} Data</h2>
+        {{ ticker_data.to_html(classes='table table-striped') | safe }}
+    </div>
+</div>
+<div>
+    <h2>Prediction Quality Metrics</h2>
+    <p>Mean Squared Error (MSE): {{ mse }}</p>
+    <p>Mean Absolute Error (MAE): {{ mae }}</p>
+    <p>R² Score: {{ r2 }}</p>
+</div>
+{% endblock %}
