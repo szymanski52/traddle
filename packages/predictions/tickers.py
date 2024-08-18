@@ -20,7 +20,7 @@ class Ticker:
         df = df.dropna()
 
         df = Ticker.__fix_tz(df)
-        df = Ticker.__create_lag_features(df)
+        #df = Ticker.__create_lag_features(df)
 
         return df
 

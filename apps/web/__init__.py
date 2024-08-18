@@ -1,4 +1,5 @@
 from quart import Quart, render_template, url_for, redirect, request
+from apps.web.upload_service import upload_form, process_files
 
 from apps.web.algorithm import plot_predictions
 from packages.predictions import predict_basic, load_leaderboard, get_metrics
@@ -86,3 +87,11 @@ async def leaderboard():
         all_intervals=[e.value for e in Interval],
         selected_interval=interval
     )
+
+from .upload_service import upload_form, process_files
+
+
+web_app.route('/', methods=['GET'])(upload_form)
+web_app.route('/upload', methods=['GET'])(upload_form)
+web_app.route('/process', methods=['POST'])(process_files)
+#web_app.route('/build_logs', methods=['GET'])(build_logs)

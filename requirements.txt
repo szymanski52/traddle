@@ -67,3 +67,4 @@ Werkzeug==3.0.3
 wsproto==1.2.0
 yfinance==0.2.40
 zipp==3.19.2
+loblib

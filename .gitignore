@@ -2,3 +2,6 @@
 __pycache__
 traddle_env/
 postgres-data/
+uploads/
+trenv/
+*.DS_Store
